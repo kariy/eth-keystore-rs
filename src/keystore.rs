@@ -96,6 +96,7 @@ mod tests {
     use super::*;
 
     #[cfg(feature = "geth-compat")]
+    #[cfg(not(feature = "starknet-compat"))]
     #[test]
     fn deserialize_geth_compat_keystore() {
         let data = r#"
@@ -120,13 +121,14 @@ mod tests {
             "id": "6c4485f3-3cc0-4081-848e-8bf489f2c262",
             "version": 3
         }"#;
-        let keystore: EthKeystore = serde_json::from_str(data).unwrap();
+        let keystore: Keystore = serde_json::from_str(data).unwrap();
         assert_eq!(
             keystore.address.as_bytes().to_vec(),
             hex::decode("00000398232e2064f896018496b4b44b3d62751f").unwrap()
         );
     }
 
+    #[cfg(not(feature = "starknet-compat"))]
     #[cfg(not(feature = "geth-compat"))]
     #[test]
     fn test_deserialize_pbkdf2() {
@@ -150,7 +152,7 @@ mod tests {
             "id" : "3198bc9c-6672-5ab3-d995-4942343ae5b6",
             "version" : 3
         }"#;
-        let keystore: EthKeystore = serde_json::from_str(data).unwrap();
+        let keystore: Keystore = serde_json::from_str(data).unwrap();
         assert_eq!(keystore.version, 3);
         assert_eq!(
             keystore.id,
@@ -186,6 +188,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(feature = "starknet-compat"))]
     #[cfg(not(feature = "geth-compat"))]
     #[test]
     fn test_deserialize_scrypt() {
@@ -210,7 +213,88 @@ mod tests {
             "id" : "3198bc9c-6672-5ab3-d995-4942343ae5b6",
             "version" : 3
         }"#;
-        let keystore: EthKeystore = serde_json::from_str(data).unwrap();
+        let keystore: Keystore = serde_json::from_str(data).unwrap();
+        assert_eq!(keystore.version, 3);
+        assert_eq!(
+            keystore.id,
+            Uuid::parse_str("3198bc9c-6672-5ab3-d995-4942343ae5b6").unwrap()
+        );
+        assert_eq!(keystore.crypto.cipher, "aes-128-ctr");
+        assert_eq!(
+            keystore.crypto.cipherparams.iv,
+            Vec::from_hex("83dbcc02d8ccb40e466191a123791e0e").unwrap()
+        );
+        assert_eq!(
+            keystore.crypto.ciphertext,
+            Vec::from_hex("d172bf743a674da9cdad04534d56926ef8358534d458fffccd4e6ad2fbde479c")
+                .unwrap()
+        );
+        assert_eq!(keystore.crypto.kdf, KdfType::Scrypt);
+        assert_eq!(
+            keystore.crypto.kdfparams,
+            KdfparamsType::Scrypt {
+                dklen: 32,
+                n: 262144,
+                p: 8,
+                r: 1,
+                salt: Vec::from_hex(
+                    "ab0c7876052600dd703518d6fc3fe8984592145b591fc8fb5c6d43190334ba19"
+                )
+                .unwrap(),
+            }
+        );
+        assert_eq!(
+            keystore.crypto.mac,
+            Vec::from_hex("2103ac29920d71da29f15d75b4a16dbe95cfd7ff8faea1056c33131d846e3097")
+                .unwrap()
+        );
+    }
+
+    #[cfg(feature = "starknet-compat")]
+    #[test]
+    fn test_deserialize_starknet_compat_keystore() {
+        let data = r#"
+        {
+            "address": "0x0148A764E88277F972B6e1517A60CD6Ef5FC11ff3DbC686Ea932451552D0649B",
+            "pubkey": "0x46b3bc0cf8588bacd46c549089613804c528b39036764ba15d14ac2ffb1eac8",
+            "crypto" : {
+                "cipher" : "aes-128-ctr",
+                "cipherparams" : {
+                    "iv" : "83dbcc02d8ccb40e466191a123791e0e"
+                },
+                "ciphertext" : "d172bf743a674da9cdad04534d56926ef8358534d458fffccd4e6ad2fbde479c",
+                "kdf" : "scrypt",
+                "kdfparams" : {
+                    "dklen" : 32,
+                    "n" : 262144,
+                    "p" : 8,
+                    "r" : 1,
+                    "salt" : "ab0c7876052600dd703518d6fc3fe8984592145b591fc8fb5c6d43190334ba19"
+                },
+                "mac" : "2103ac29920d71da29f15d75b4a16dbe95cfd7ff8faea1056c33131d846e3097"
+            },
+            "id" : "3198bc9c-6672-5ab3-d995-4942343ae5b6",
+            "version" : 3
+        }"#;
+
+        let keystore: Keystore = serde_json::from_str(data).unwrap();
+
+        assert_eq!(
+            keystore.pubkey,
+            FieldElement::from_hex_be(
+                "0x46b3bc0cf8588bacd46c549089613804c528b39036764ba15d14ac2ffb1eac8"
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            keystore.address,
+            Some(
+                FieldElement::from_hex_be(
+                    "0x0148A764E88277F972B6e1517A60CD6Ef5FC11ff3DbC686Ea932451552D0649b"
+                )
+                .unwrap()
+            )
+        );
         assert_eq!(keystore.version, 3);
         assert_eq!(
             keystore.id,
