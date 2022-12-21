@@ -1,6 +1,9 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 //! A minimalist library to interact with encrypted JSON keystores as per the
 //! [Web3 Secret Storage Definition](https://github.com/ethereum/wiki/wiki/Web3-Secret-Storage-Definition).
+//!
+#[cfg(all(feature = "geth-compat", feature = "starknet-compat"))]
+compile_error!("feature geth-compat and starknet-compat cannot be enabled together!");
 
 use aes::{
     cipher::{self, InnerIvInit, KeyInit, StreamCipherCore},
@@ -14,6 +17,13 @@ use scrypt::{scrypt, Params as ScryptParams};
 use sha2::Sha256;
 use sha3::Keccak256;
 use uuid::Uuid;
+
+#[cfg(feature = "starknet-compat")]
+use ark_ff::{BigInteger256, UniformRand};
+#[cfg(feature = "starknet-compat")]
+use starknet_crypto::FieldElement;
+#[cfg(feature = "starknet-compat")]
+use utils::starknet_compat;
 
 use std::{
     fs::File,
@@ -29,7 +39,7 @@ mod utils;
 use utils::geth_compat::address_from_pk;
 
 pub use error::KeystoreError;
-pub use keystore::{CipherparamsJson, CryptoJson, EthKeystore, KdfType, KdfparamsType};
+pub use keystore::{CipherparamsJson, CryptoJson, KdfType, KdfparamsType, Keystore};
 
 const DEFAULT_CIPHER: &str = "aes-128-ctr";
 const DEFAULT_KEY_SIZE: usize = 32usize;
@@ -73,11 +83,28 @@ where
     R: Rng + CryptoRng,
     S: AsRef<[u8]>,
 {
-    // Generate a random private key.
-    let mut pk = vec![0u8; DEFAULT_KEY_SIZE];
-    rng.fill_bytes(pk.as_mut_slice());
+    #[cfg(feature = "starknet-compat")]
+    let pk = FieldElement::from_mont(BigInteger256::rand(rng).0)
+        .to_bytes_be()
+        .to_vec();
 
-    let name = encrypt_key(dir, rng, &pk, password, name)?;
+    #[cfg(not(feature = "starknet-compat"))]
+    // Generate a random private key.
+    let pk = {
+        let mut sk = vec![0u8; DEFAULT_KEY_SIZE];
+        rng.fill_bytes(sk.as_mut_slice());
+        sk
+    };
+
+    let name = encrypt_key(
+        dir,
+        rng,
+        &pk,
+        password,
+        name,
+        #[cfg(feature = "starknet-compat")]
+        None,
+    )?;
     Ok((pk, name))
 }
 
@@ -106,7 +133,7 @@ where
     let mut file = File::open(path)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
-    let keystore: EthKeystore = serde_json::from_str(&contents)?;
+    let keystore: Keystore = serde_json::from_str(&contents)?;
 
     // Derive the key.
     let key = match keystore.crypto.kdfparams {
@@ -185,6 +212,7 @@ pub fn encrypt_key<P, R, B, S>(
     pk: B,
     password: S,
     name: Option<&str>,
+    #[cfg(feature = "starknet-compat")] account: Option<FieldElement>,
 ) -> Result<String, KeystoreError>
 where
     P: AsRef<Path>,
@@ -229,7 +257,7 @@ where
     };
 
     // Construct and serialize the encrypted JSON keystore.
-    let keystore = EthKeystore {
+    let keystore = Keystore {
         id,
         version: 3,
         crypto: CryptoJson {
@@ -248,6 +276,11 @@ where
         },
         #[cfg(feature = "geth-compat")]
         address: address_from_pk(&pk)?,
+
+        #[cfg(feature = "starknet-compat")]
+        address: account,
+        #[cfg(feature = "starknet-compat")]
+        pubkey: starknet_compat::get_pubkey(pk)?,
     };
     let contents = serde_json::to_string(&keystore)?;
 

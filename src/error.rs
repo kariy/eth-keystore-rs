@@ -27,6 +27,10 @@ pub enum KeystoreError {
     #[cfg(feature = "geth-compat")]
     #[error(transparent)]
     K256Error(#[from] k256::ecdsa::Error),
+
+    #[cfg(feature = "starknet-compat")]
+    #[error(transparent)]
+    FieldElementError(#[from] starknet_ff::FromByteArrayError),
 }
 
 impl From<scrypt::errors::InvalidParams> for KeystoreError {

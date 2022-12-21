@@ -5,12 +5,20 @@ use uuid::Uuid;
 #[cfg(feature = "geth-compat")]
 use ethereum_types::H160 as Address;
 
+#[cfg(feature = "starknet-compat")]
+use starknet_crypto::FieldElement;
+
 #[derive(Debug, Deserialize, Serialize)]
 /// This struct represents the deserialized form of an encrypted JSON keystore based on the
 /// [Web3 Secret Storage Definition](https://github.com/ethereum/wiki/wiki/Web3-Secret-Storage-Definition).
-pub struct EthKeystore {
+pub struct Keystore {
     #[cfg(feature = "geth-compat")]
     pub address: Address,
+
+    #[cfg(feature = "starknet-compat")]
+    pub address: Option<FieldElement>,
+    #[cfg(feature = "starknet-compat")]
+    pub pubkey: FieldElement,
 
     pub crypto: CryptoJson,
     pub id: Uuid,
