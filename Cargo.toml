@@ -32,8 +32,8 @@ ethereum-types = { version = "0.13.1", optional = true }
 k256 = { version = "0.11.0", optional = true }
 
 # feature = "starknet-compat"
-starknet-crypto = { version = "0.2.0", optional = true }
-starknet-ff = { version = "0.2.0", optional = true}
+starknet-crypto = { git = "https://github.com/xJonathanLEI/starknet-rs.git", optional = true }
+starknet-ff = { git = "https://github.com/xJonathanLEI/starknet-rs.git", optional = true}
 ark-ff = { version = "0.3.0", optional = true }
 
 [features]
