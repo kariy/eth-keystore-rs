@@ -2,8 +2,6 @@
 //! A minimalist library to interact with encrypted JSON keystores as per the
 //! [Web3 Secret Storage Definition](https://github.com/ethereum/wiki/wiki/Web3-Secret-Storage-Definition).
 //!
-#[cfg(all(feature = "geth-compat", feature = "starknet-compat"))]
-compile_error!("feature geth-compat and starknet-compat cannot be enabled together!");
 
 use aes::{
     cipher::{self, InnerIvInit, KeyInit, StreamCipherCore},
@@ -34,9 +32,6 @@ use std::{
 mod error;
 mod keystore;
 mod utils;
-
-#[cfg(feature = "geth-compat")]
-use utils::geth_compat::address_from_pk;
 
 pub use error::KeystoreError;
 pub use keystore::{CipherparamsJson, CryptoJson, KdfType, KdfparamsType, Keystore};
@@ -274,8 +269,6 @@ where
             },
             mac: mac.to_vec(),
         },
-        #[cfg(feature = "geth-compat")]
-        address: address_from_pk(&pk)?,
 
         #[cfg(feature = "starknet-compat")]
         address: account,
