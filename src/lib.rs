@@ -14,14 +14,8 @@ use rand::{CryptoRng, Rng};
 use scrypt::{scrypt, Params as ScryptParams};
 use sha2::Sha256;
 use sha3::Keccak256;
-use uuid::Uuid;
-
-#[cfg(feature = "starknet-compat")]
-use ark_ff::{BigInteger256, UniformRand};
-#[cfg(feature = "starknet-compat")]
 use starknet_crypto::FieldElement;
-#[cfg(feature = "starknet-compat")]
-use utils::starknet_compat;
+use uuid::Uuid;
 
 use std::{
     fs::File,
@@ -34,7 +28,7 @@ mod keystore;
 mod utils;
 
 pub use error::KeystoreError;
-pub use keystore::{CipherparamsJson, CryptoJson, KdfType, KdfparamsType, Keystore};
+pub use keystore::{CipherparamsJson, CryptoJson, KdfType, KdfparamsType, Keystore, StarknetChain};
 
 const DEFAULT_CIPHER: &str = "aes-128-ctr";
 const DEFAULT_KEY_SIZE: usize = 32usize;
@@ -52,7 +46,7 @@ const DEFAULT_KDF_PARAMS_P: u32 = 1u32;
 /// # Example
 ///
 /// ```no_run
-/// use eth_keystore::new;
+/// use starknet_keystore::{new, StarknetChain};
 /// use std::path::Path;
 ///
 /// # async fn foobar() -> Result<(), Box<dyn std::error::Error>> {
@@ -60,10 +54,10 @@ const DEFAULT_KDF_PARAMS_P: u32 = 1u32;
 /// let mut rng = rand::thread_rng();
 /// // here `None` signifies we don't specify a filename for the keystore.
 /// // the default filename is a generated Uuid for the keystore.
-/// let (private_key, name) = new(&dir, &mut rng, "password_to_keystore", None)?;
+/// let (private_key, name) = new(&dir, &mut rng, "password_to_keystore", None, None, Some(StarknetChain::MAINNET))?;
 ///
 /// // here `Some("my_key")` denotes a custom filename passed by the caller.
-/// let (private_key, name) = new(&dir, &mut rng, "password_to_keystore", Some("my_key"))?;
+/// let (private_key, name) = new(&dir, &mut rng, "password_to_keystore", Some("my_key"), None, None)?;
 /// # Ok(())
 /// # }
 /// ```
@@ -72,18 +66,14 @@ pub fn new<P, R, S>(
     rng: &mut R,
     password: S,
     name: Option<&str>,
+    account: Option<FieldElement>,
+    chain: Option<StarknetChain>,
 ) -> Result<(Vec<u8>, String), KeystoreError>
 where
     P: AsRef<Path>,
     R: Rng + CryptoRng,
     S: AsRef<[u8]>,
 {
-    #[cfg(feature = "starknet-compat")]
-    let pk = FieldElement::from_mont(BigInteger256::rand(rng).0)
-        .to_bytes_be()
-        .to_vec();
-
-    #[cfg(not(feature = "starknet-compat"))]
     // Generate a random private key.
     let pk = {
         let mut sk = vec![0u8; DEFAULT_KEY_SIZE];
@@ -91,15 +81,7 @@ where
         sk
     };
 
-    let name = encrypt_key(
-        dir,
-        rng,
-        &pk,
-        password,
-        name,
-        #[cfg(feature = "starknet-compat")]
-        None,
-    )?;
+    let name = encrypt_key(dir, rng, &pk, password, name, account, chain)?;
     Ok((pk, name))
 }
 
@@ -110,7 +92,7 @@ where
 /// # Example
 ///
 /// ```no_run
-/// use eth_keystore::decrypt_key;
+/// use starknet_keystore::decrypt_key;
 /// use std::path::Path;
 ///
 /// # async fn foobar() -> Result<(), Box<dyn std::error::Error>> {
@@ -184,7 +166,7 @@ where
 /// # Example
 ///
 /// ```no_run
-/// use eth_keystore::encrypt_key;
+/// use starknet_keystore::encrypt_key;
 /// use rand::RngCore;
 /// use std::path::Path;
 ///
@@ -197,7 +179,7 @@ where
 /// rng.fill_bytes(private_key.as_mut_slice());
 ///
 /// // Since we specify a custom filename for the keystore, it will be stored in `$dir/my-key`
-/// let name = encrypt_key(&dir, &mut rng, &private_key, "password_to_keystore", Some("my-key"))?;
+/// let name = encrypt_key(&dir, &mut rng, &private_key, "password_to_keystore", Some("my-key"), None, None)?;
 /// # Ok(())
 /// # }
 /// ```
@@ -207,7 +189,8 @@ pub fn encrypt_key<P, R, B, S>(
     pk: B,
     password: S,
     name: Option<&str>,
-    #[cfg(feature = "starknet-compat")] account: Option<FieldElement>,
+    account: Option<FieldElement>,
+    chain: Option<StarknetChain>,
 ) -> Result<String, KeystoreError>
 where
     P: AsRef<Path>,
@@ -269,11 +252,9 @@ where
             },
             mac: mac.to_vec(),
         },
-
-        #[cfg(feature = "starknet-compat")]
+        chain,
         address: account,
-        #[cfg(feature = "starknet-compat")]
-        pubkey: starknet_compat::get_pubkey(pk)?,
+        pubkey: utils::get_pubkey(pk).ok(),
     };
     let contents = serde_json::to_string(&keystore)?;
 

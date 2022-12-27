@@ -23,7 +23,6 @@ pub enum KeystoreError {
     #[error("aes {0:?}")]
     AesInvalidKeyNonceLength(aes::cipher::InvalidLength),
 
-    #[cfg(feature = "starknet-compat")]
     #[error(transparent)]
     FieldElementError(#[from] starknet_ff::FromByteArrayError),
 }

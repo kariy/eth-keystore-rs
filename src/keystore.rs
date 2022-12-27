@@ -2,18 +2,47 @@ use hex::{FromHex, ToHex};
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 use uuid::Uuid;
 
-#[cfg(feature = "starknet-compat")]
 use starknet_crypto::FieldElement;
+
+#[derive(Debug, Serialize)]
+pub enum StarknetChain {
+    MAINNET,
+    TESTNET,
+    TESTNET2,
+}
+
+impl<'de> Deserialize<'de> for StarknetChain {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        match value.as_str() {
+            "mainnet" => Ok(Self::MAINNET),
+            "testnet" => Ok(Self::TESTNET),
+            "testnet2" => Ok(Self::TESTNET2),
+            _ => Err(serde::de::Error::custom("invalid chain id")),
+        }
+    }
+}
+
+impl std::fmt::Display for StarknetChain {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MAINNET => write!(f, "mainnet"),
+            Self::TESTNET => write!(f, "testnet"),
+            Self::TESTNET2 => write!(f, "testnet2"),
+        }
+    }
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 /// This struct represents the deserialized form of an encrypted JSON keystore based on the
 /// [Web3 Secret Storage Definition](https://github.com/ethereum/wiki/wiki/Web3-Secret-Storage-Definition).
 pub struct Keystore {
-    #[cfg(feature = "starknet-compat")]
     pub address: Option<FieldElement>,
-    #[cfg(feature = "starknet-compat")]
-    pub pubkey: FieldElement,
-
+    pub pubkey: Option<FieldElement>,
+    pub chain: Option<StarknetChain>,
     pub crypto: CryptoJson,
     pub id: Uuid,
     pub version: u8,
@@ -89,11 +118,13 @@ where
 mod tests {
     use super::*;
 
-    #[cfg(not(feature = "starknet-compat"))]
     #[test]
     fn test_deserialize_pbkdf2() {
         let data = r#"
         {
+            "address": null,
+            "pubkey": null,
+            "chain": null,
             "crypto" : {
                 "cipher" : "aes-128-ctr",
                 "cipherparams" : {
@@ -148,74 +179,13 @@ mod tests {
         );
     }
 
-    #[cfg(not(feature = "starknet-compat"))]
     #[test]
     fn test_deserialize_scrypt() {
         let data = r#"
         {
-            "crypto" : {
-                "cipher" : "aes-128-ctr",
-                "cipherparams" : {
-                    "iv" : "83dbcc02d8ccb40e466191a123791e0e"
-                },
-                "ciphertext" : "d172bf743a674da9cdad04534d56926ef8358534d458fffccd4e6ad2fbde479c",
-                "kdf" : "scrypt",
-                "kdfparams" : {
-                    "dklen" : 32,
-                    "n" : 262144,
-                    "p" : 8,
-                    "r" : 1,
-                    "salt" : "ab0c7876052600dd703518d6fc3fe8984592145b591fc8fb5c6d43190334ba19"
-                },
-                "mac" : "2103ac29920d71da29f15d75b4a16dbe95cfd7ff8faea1056c33131d846e3097"
-            },
-            "id" : "3198bc9c-6672-5ab3-d995-4942343ae5b6",
-            "version" : 3
-        }"#;
-        let keystore: Keystore = serde_json::from_str(data).unwrap();
-        assert_eq!(keystore.version, 3);
-        assert_eq!(
-            keystore.id,
-            Uuid::parse_str("3198bc9c-6672-5ab3-d995-4942343ae5b6").unwrap()
-        );
-        assert_eq!(keystore.crypto.cipher, "aes-128-ctr");
-        assert_eq!(
-            keystore.crypto.cipherparams.iv,
-            Vec::from_hex("83dbcc02d8ccb40e466191a123791e0e").unwrap()
-        );
-        assert_eq!(
-            keystore.crypto.ciphertext,
-            Vec::from_hex("d172bf743a674da9cdad04534d56926ef8358534d458fffccd4e6ad2fbde479c")
-                .unwrap()
-        );
-        assert_eq!(keystore.crypto.kdf, KdfType::Scrypt);
-        assert_eq!(
-            keystore.crypto.kdfparams,
-            KdfparamsType::Scrypt {
-                dklen: 32,
-                n: 262144,
-                p: 8,
-                r: 1,
-                salt: Vec::from_hex(
-                    "ab0c7876052600dd703518d6fc3fe8984592145b591fc8fb5c6d43190334ba19"
-                )
-                .unwrap(),
-            }
-        );
-        assert_eq!(
-            keystore.crypto.mac,
-            Vec::from_hex("2103ac29920d71da29f15d75b4a16dbe95cfd7ff8faea1056c33131d846e3097")
-                .unwrap()
-        );
-    }
-
-    #[cfg(feature = "starknet-compat")]
-    #[test]
-    fn test_deserialize_starknet_compat_keystore() {
-        let data = r#"
-        {
             "address": "0x0148A764E88277F972B6e1517A60CD6Ef5FC11ff3DbC686Ea932451552D0649B",
             "pubkey": "0x46b3bc0cf8588bacd46c549089613804c528b39036764ba15d14ac2ffb1eac8",
+            "chain": "mainnet",
             "crypto" : {
                 "cipher" : "aes-128-ctr",
                 "cipherparams" : {
@@ -243,7 +213,7 @@ mod tests {
             FieldElement::from_hex_be(
                 "0x46b3bc0cf8588bacd46c549089613804c528b39036764ba15d14ac2ffb1eac8"
             )
-            .unwrap()
+            .ok()
         );
         assert_eq!(
             keystore.address,
