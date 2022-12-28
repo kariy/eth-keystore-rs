@@ -256,7 +256,7 @@ where
         address: account,
         pubkey: utils::get_pubkey(pk).ok(),
     };
-    let contents = serde_json::to_string(&keystore)?;
+    let contents = serde_json::to_string_pretty(&keystore)?;
 
     // Create a file in write-only mode, to store the encrypted JSON keystore.
     let mut file = File::create(dir.as_ref().join(&name))?;
