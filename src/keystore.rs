@@ -77,7 +77,7 @@ where
 {
     use serde::de::Error;
     String::deserialize(deserializer)
-        .and_then(|string| Vec::from_hex(&string).map_err(|err| Error::custom(err.to_string())))
+        .and_then(|string| Vec::from_hex(string).map_err(|err| Error::custom(err.to_string())))
 }
 
 #[cfg(test)]

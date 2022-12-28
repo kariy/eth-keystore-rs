@@ -81,7 +81,7 @@ where
         FieldElement::from_mont(sk).to_bytes_be()
     };
 
-    let name = encrypt_key(dir, rng, &pk, password, name, account, chain)?;
+    let name = encrypt_key(dir, rng, pk, password, name, account, chain)?;
     Ok((pk.to_vec(), name))
 }
 
@@ -259,7 +259,7 @@ where
     let contents = serde_json::to_string_pretty(&keystore)?;
 
     // Create a file in write-only mode, to store the encrypted JSON keystore.
-    let mut file = File::create(dir.as_ref().join(&name))?;
+    let mut file = File::create(dir.as_ref().join(name))?;
     file.write_all(contents.as_bytes())?;
 
     Ok(id.to_string())
