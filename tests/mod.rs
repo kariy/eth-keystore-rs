@@ -3,6 +3,8 @@ use starknet_keystore::{decrypt_key, encrypt_key, new};
 use std::path::Path;
 
 mod tests {
+    use starknet_crypto::FieldElement;
+
     use super::*;
 
     #[test]
@@ -19,6 +21,10 @@ mod tests {
         );
         assert!(decrypt_key(&keypath, "notthebestrandompassword").is_err());
         assert!(std::fs::remove_file(&keypath).is_ok());
+        assert!(FieldElement::from_bytes_be(unsafe {
+            &*((secret.as_slice() as *const [u8]) as *const [u8; 32])
+        })
+        .is_ok())
     }
 
     #[test]

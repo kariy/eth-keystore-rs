@@ -28,7 +28,7 @@ mod keystore;
 mod utils;
 
 pub use error::KeystoreError;
-pub use keystore::{CipherparamsJson, CryptoJson, KdfType, KdfparamsType, Keystore, StarknetChain};
+pub use keystore::{CipherparamsJson, CryptoJson, KdfType, KdfparamsType, Keystore};
 
 const DEFAULT_CIPHER: &str = "aes-128-ctr";
 const DEFAULT_KEY_SIZE: usize = 32usize;
@@ -46,7 +46,7 @@ const DEFAULT_KDF_PARAMS_P: u32 = 1u32;
 /// # Example
 ///
 /// ```no_run
-/// use starknet_keystore::{new, StarknetChain};
+/// use starknet_keystore::new;
 /// use std::path::Path;
 ///
 /// # async fn foobar() -> Result<(), Box<dyn std::error::Error>> {
@@ -54,7 +54,7 @@ const DEFAULT_KDF_PARAMS_P: u32 = 1u32;
 /// let mut rng = rand::thread_rng();
 /// // here `None` signifies we don't specify a filename for the keystore.
 /// // the default filename is a generated Uuid for the keystore.
-/// let (private_key, name) = new(&dir, &mut rng, "password_to_keystore", None, None, Some(StarknetChain::MAINNET))?;
+/// let (private_key, name) = new(&dir, &mut rng, "password_to_keystore", None, None, Some("mainnet".to_string()))?;
 ///
 /// // here `Some("my_key")` denotes a custom filename passed by the caller.
 /// let (private_key, name) = new(&dir, &mut rng, "password_to_keystore", Some("my_key"), None, None)?;
@@ -66,8 +66,8 @@ pub fn new<P, R, S>(
     rng: &mut R,
     password: S,
     name: Option<&str>,
-    account: Option<FieldElement>,
-    chain: Option<StarknetChain>,
+    account: Option<String>,
+    chain: Option<String>,
 ) -> Result<(Vec<u8>, String), KeystoreError>
 where
     P: AsRef<Path>,
@@ -76,13 +76,13 @@ where
 {
     // Generate a random private key.
     let pk = {
-        let mut sk = vec![0u8; DEFAULT_KEY_SIZE];
-        rng.fill_bytes(sk.as_mut_slice());
-        sk
+        let mut sk = [0u64; 4];
+        rng.fill(sk.as_mut_slice());
+        FieldElement::from_mont(sk).to_bytes_be()
     };
 
     let name = encrypt_key(dir, rng, &pk, password, name, account, chain)?;
-    Ok((pk, name))
+    Ok((pk.to_vec(), name))
 }
 
 /// Decrypts an encrypted JSON keystore at the provided `path` using the provided `password`.
@@ -189,8 +189,8 @@ pub fn encrypt_key<P, R, B, S>(
     pk: B,
     password: S,
     name: Option<&str>,
-    account: Option<FieldElement>,
-    chain: Option<StarknetChain>,
+    account: Option<String>,
+    chain: Option<String>,
 ) -> Result<String, KeystoreError>
 where
     P: AsRef<Path>,

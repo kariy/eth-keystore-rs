@@ -2,47 +2,13 @@ use hex::{FromHex, ToHex};
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 use uuid::Uuid;
 
-use starknet_crypto::FieldElement;
-
-#[derive(Debug, Serialize)]
-pub enum StarknetChain {
-    MAINNET,
-    TESTNET,
-    TESTNET2,
-}
-
-impl<'de> Deserialize<'de> for StarknetChain {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = String::deserialize(deserializer)?;
-        match value.as_str() {
-            "mainnet" => Ok(Self::MAINNET),
-            "testnet" => Ok(Self::TESTNET),
-            "testnet2" => Ok(Self::TESTNET2),
-            _ => Err(serde::de::Error::custom("invalid chain id")),
-        }
-    }
-}
-
-impl std::fmt::Display for StarknetChain {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::MAINNET => write!(f, "mainnet"),
-            Self::TESTNET => write!(f, "testnet"),
-            Self::TESTNET2 => write!(f, "testnet2"),
-        }
-    }
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 /// This struct represents the deserialized form of an encrypted JSON keystore based on the
 /// [Web3 Secret Storage Definition](https://github.com/ethereum/wiki/wiki/Web3-Secret-Storage-Definition).
 pub struct Keystore {
-    pub address: Option<FieldElement>,
-    pub pubkey: Option<FieldElement>,
-    pub chain: Option<StarknetChain>,
+    pub address: Option<String>,
+    pub pubkey: Option<String>,
+    pub chain: Option<String>,
     pub crypto: CryptoJson,
     pub id: Uuid,
     pub version: u8,
@@ -116,6 +82,9 @@ where
 
 #[cfg(test)]
 mod tests {
+    use starknet_crypto::FieldElement;
+    use std::str::FromStr;
+
     use super::*;
 
     #[test]
@@ -124,7 +93,7 @@ mod tests {
         {
             "address": null,
             "pubkey": null,
-            "chain": null,
+            "chain": "mainnet",
             "crypto" : {
                 "cipher" : "aes-128-ctr",
                 "cipherparams" : {
@@ -209,20 +178,18 @@ mod tests {
         let keystore: Keystore = serde_json::from_str(data).unwrap();
 
         assert_eq!(
-            keystore.pubkey,
+            FieldElement::from_str(&keystore.pubkey.unwrap()).ok(),
             FieldElement::from_hex_be(
                 "0x46b3bc0cf8588bacd46c549089613804c528b39036764ba15d14ac2ffb1eac8"
             )
             .ok()
         );
         assert_eq!(
-            keystore.address,
-            Some(
-                FieldElement::from_hex_be(
-                    "0x0148A764E88277F972B6e1517A60CD6Ef5FC11ff3DbC686Ea932451552D0649b"
-                )
-                .unwrap()
+            FieldElement::from_str(&keystore.address.unwrap()).ok(),
+            FieldElement::from_hex_be(
+                "0x0148A764E88277F972B6e1517A60CD6Ef5FC11ff3DbC686Ea932451552D0649b"
             )
+            .ok()
         );
         assert_eq!(keystore.version, 3);
         assert_eq!(
