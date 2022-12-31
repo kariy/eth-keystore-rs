@@ -77,7 +77,7 @@ where
 {
     use serde::de::Error;
     String::deserialize(deserializer).and_then(|string| {
-        let hex = string.strip_prefix("0x").unwrap_or_else(|| string.as_str());
+        let hex = string.strip_prefix("0x").unwrap_or(string.as_str());
         Vec::from_hex(hex).map_err(|err| Error::custom(err.to_string()))
     })
 }
