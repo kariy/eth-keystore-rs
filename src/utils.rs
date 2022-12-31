@@ -10,5 +10,5 @@ pub fn get_pubkey<T: AsRef<[u8]>>(secret_scalar: T) -> Result<String, KeystoreEr
     let sk = unsafe { &*(secret_scalar.as_ref().as_ptr() as *const [u8; 32]) };
     let sk = FieldElement::from_bytes_be(sk).map_err(KeystoreError::FieldElementError)?;
 
-    Ok(format!("{:x}", get_public_key(&sk)))
+    Ok(format!("{:#x}", get_public_key(&sk)))
 }

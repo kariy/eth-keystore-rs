@@ -68,7 +68,7 @@ where
     T: AsRef<[u8]>,
     S: Serializer,
 {
-    serializer.serialize_str(&buffer.encode_hex::<String>())
+    serializer.serialize_str(&format!("0x{}", buffer.encode_hex::<String>()))
 }
 
 fn hex_to_buffer<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
@@ -76,8 +76,10 @@ where
     D: Deserializer<'de>,
 {
     use serde::de::Error;
-    String::deserialize(deserializer)
-        .and_then(|string| Vec::from_hex(string).map_err(|err| Error::custom(err.to_string())))
+    String::deserialize(deserializer).and_then(|string| {
+        let hex = string.strip_prefix("0x").unwrap_or_else(|| string.as_str());
+        Vec::from_hex(hex).map_err(|err| Error::custom(err.to_string()))
+    })
 }
 
 #[cfg(test)]
